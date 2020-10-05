@@ -23,8 +23,15 @@ object TweetPreprocess {
       res.replaceAll(s"[^a-zA-Z]$pattern[^a-zA-Z]", " "+ReplaceDictionaries.short2Normal(pattern)+" ")
     }
     //    removes all punctuation & numbers except - sign
-    tweetLower.replaceAll("""[\p{Punct}&&[^-@')(:]]""", " ").filter(!_.isDigit).
-      replaceAll(" +", " ").split(" ").filter(x => !x.contains("@")).mkString(" ")
+    var isUrl="""^((https?|ftp|smtp):\/\/)?(www.)?[a-z0-9]+\.[a-z]+(\/[a-zA-Z0-9#]+\/?)*$"""
+
+    tweetLower.replaceAll("""[\p{Punct}&&[^-@')(:]]""", " ")
+    .filter(!_.isDigit)
+    .replaceAll(" +", " ")
+    .split(" ")
+    .filter(x => !x.contains("@"))
+    .filter(x => !x.matches(isUrl))
+    .mkString(" ")
   }
 
 }
