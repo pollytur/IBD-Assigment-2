@@ -16,7 +16,6 @@ object TweetPreprocess {
       res.replaceAll(s"[^a-zA-Z]$pattern[^a-zA-Z]", " "+ReplaceDictionaries.apostrophes2Normal(pattern)+" ")
     }
 
-
     tweetLower = ReplaceDictionaries.smiles2Text.keys.foldLeft(tweetLower) { case (res, pattern) =>
       res.replaceAll(s"[^a-zA-Z]$pattern[^a-zA-Z]", " "+ReplaceDictionaries.smiles2Text(pattern)+" ")
     }
@@ -25,8 +24,7 @@ object TweetPreprocess {
       res.replaceAll(s"[^a-zA-Z]$pattern[^a-zA-Z]", " "+ReplaceDictionaries.short2Normal(pattern)+" ")
     }
     //    removes all punctuation & numbers except - sign
-    tweetLower.replaceAll("""[\p{Punct}&&[^-@')(:]]""", " ").filter(!_.isDigit).
+    tweetLower.replaceAll("""[\p{Punct}&&[^-@]]""", " ").filter(!_.isDigit).
       replaceAll(" +", " ").split(" ").filter(x => !x.contains("@")).mkString(" ")
   }
-
 }
