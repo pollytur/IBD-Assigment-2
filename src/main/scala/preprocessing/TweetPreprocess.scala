@@ -38,9 +38,23 @@ object TweetPreprocess {
   def stopWords(tweet: String): String = {
     tweet
     .split(" ")
-    .filter(x => !x.contains("@"))
     .filter(x => !StopWords.stopWords.contains(x))
     .mkString(" ")
+  }
+
+  def remUsernames(tweet: String): String = {
+     tweet
+    .split(" ")
+    .filter(x => !x.contains("@"))
+    .mkString(" ")
+  }
+
+  def preprocessTweetWOStopWords(tweet: String): String = {
+    /*
+    removes user tags, replaces smiles with happy/sad tags, decrypts abbreviation
+    */
+    //    removes all punctuation & numbers except - sign
+    remUsernames(remPunct(remUrl(dictRemoval(tweet)))).trim()
   }
 
   def preprocessTweet(tweet: String): String = {
@@ -48,6 +62,6 @@ object TweetPreprocess {
     removes user tags, replaces smiles with happy/sad tags, decrypts abbreviation
     */
     //    removes all punctuation & numbers except - sign
-    stopWords(remPunct(remUrl(dictRemoval(tweet))))
+    stopWords(remUsernames(remPunct(remUrl(dictRemoval(tweet))))).trim()
   }
 }
