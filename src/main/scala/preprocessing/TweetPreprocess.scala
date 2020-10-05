@@ -31,6 +31,7 @@ object TweetPreprocess {
     .split(" ")
     .filter(x => !x.contains("@"))
     .filter(x => !x.matches(isUrl))
+    .filter(x => !StopWords.stopWords.contains(x))
     .mkString(" ")
   }
 
