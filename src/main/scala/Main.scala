@@ -1,11 +1,13 @@
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.feature.Word2Vec
+import org.apache.spark.sql.Row
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.ml.feature.StopWordsRemover
 import preprocessing.TweetPreprocess.preprocessTweet
+import org.apache.spark.ml.feature.{RegexTokenizer, Tokenizer}
+import org.apache.spark.ml.classification.{RandomForestClassificationModel, RandomForestClassifier}
+import org.apache.spark.ml.classification.LogisticRegression
+
 
 object Main extends App {
-  //  println(preprocessTweet("@model i love8 u take with u all the meu in 6291 :) "))
-  val session = SparkSession.builder().appName("app_name").master("local").getOrCreate()
-  println("done")
-  val training = session.read.format("csv").load("src/main/sourses/training.csv").rdd
-  println("done")
-  println(training.id)
 }

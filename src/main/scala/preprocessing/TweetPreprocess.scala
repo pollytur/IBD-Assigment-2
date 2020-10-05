@@ -1,6 +1,8 @@
 package preprocessing
 
 object TweetPreprocess {
+//  todo - add spelll checking
+//  todo add links removal from tweets
 
   def preprocessTweet(tweet: String): String = {
     /*
