@@ -23,6 +23,8 @@ This project analyzies a stream of Twitter messages (aka tweets) and determine t
 
 ## How to run the project
 
-?????????
+sbt package
+
+spark-submit --class Main target/scala-2.12/project-*.jar
 
 ## [Link to full report](https://hackmd.io/PWzJJy3cSWiIVeA2-PBuSA)
