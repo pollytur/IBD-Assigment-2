@@ -11,5 +11,5 @@ import org.apache.spark.ml.classification.LogisticRegression
 
 
 object Main extends App {
-  Train.train()
+  Train.modelEvaluation()
 }

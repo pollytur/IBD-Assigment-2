@@ -1,29 +1,41 @@
 package model
 
-import org.apache.spark.ml.classification.LogisticRegression
-import org.apache.spark.ml.feature.{StopWordsRemover, Word2Vec}
+import org.apache.spark.ml.classification.{GBTClassificationModel, GBTClassifier, LogisticRegression, LogisticRegressionModel}
+import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
+import org.apache.spark.ml.feature.{StopWordsRemover, Word2Vec, Word2VecModel}
+import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.sql.SparkSession
 import preprocessing.TweetPreprocess.preprocessTweet
-import org.apache.spark.ml.classification.GBTClassifier
-import org.apache.spark.sql.functions.rand
+import org.apache.spark.sql.functions.{rand, udf}
+import org.apache.spark.sql.functions._
 
 object Train {
+  val coder0: String => Int = (arg: String) => {
+    //      arg.toInt>0 ? 1 | 0
+    if (arg.toInt > 0) {
+      1
+    }
+    else {
+      0
+    }
+  }
+  val toInt = udf(coder0)
+
+  val remover = new StopWordsRemover()
+    .setInputCol("text")
+    .setOutputCol("textTransformed")
+
+  //    https://stackoverflow.com/questions/30219592/create-new-column-with-function-in-spark-dataframe
+  val coder: String => Array[String] = (arg: String) => {
+    preprocessTweet(arg).split(" ")
+  }
+  val sqlfunc = udf(coder)
+
   def train() = {
     println("TRAIN STARTED")
     val session = SparkSession.builder().appName("app_name").master("local[2]").getOrCreate()
 
-    import org.apache.spark.sql.functions._
 
-    val coder0: String => Int = (arg: String) => {
-//      arg.toInt>0 ? 1 | 0
-      if (arg.toInt > 0) {
-        1
-      }
-      else {
-        0
-      }
-    }
-    val toInt = udf(coder0)
 
     //    val toInt = udf[Int, String](x => x.toInt>0 ? 1 | 0)
 
@@ -39,19 +51,10 @@ object Train {
     val training = split(0)
 
     println("CVS READ")
-    //    https://stackoverflow.com/questions/30219592/create-new-column-with-function-in-spark-dataframe
-    val coder: String => Array[String] = (arg: String) => {
-      preprocessTweet(arg).split(" ")
-    }
-    val sqlfunc = udf(coder)
+
     var trainingTransformed = training.withColumn("text", sqlfunc(col("text")))
 
     println("CVS PREPROCESSING")
-
-    val remover = new StopWordsRemover()
-      .setInputCol("text")
-      .setOutputCol("textTransformed")
-
 
     trainingTransformed = remover.transform(trainingTransformed)
     println("REMOVER DONE")
@@ -118,5 +121,49 @@ object Train {
     gbTree.save("myGBTree")
 
     println("GRADIENT BOOSTING TREE DONE")
+  }
+
+  def evaluationSummary(evaluator: MulticlassMetrics):Unit={
+    println(s"Confusion matrix : ${evaluator.confusionMatrix}")
+    println(s"For negative(0) label: F-score ${evaluator.fMeasure(0)}, recall: ${evaluator.recall(0)}, " +
+      s"precision: ${evaluator.precision(0)}")
+    println(s"For positive(1) label: F-score ${evaluator.fMeasure(1)}, recall: ${evaluator.recall(1)}, " +
+      s"precision: ${evaluator.precision(1)}")
+  }
+
+  def modelEvaluation(): Unit = {
+    val session = SparkSession.builder().appName("app_name").master("local[2]").getOrCreate()
+
+    import session.sqlContext.implicits._
+
+    var valid = session.read.format("csv").load("src/main/sourses/test_dataset.csv")
+      .toDF("target", "text")
+
+    valid = valid.withColumn("target", toInt(col("target")))
+    valid = valid.withColumn("text", sqlfunc(col("text")))
+    valid = remover.transform(valid)
+
+    valid = Word2VecModel.load("myWord2Vec").transform(valid)
+
+
+    val lrResults = LogisticRegressionModel.load("myLR").transform(valid).drop("text")
+      .drop("result").drop("textTransformed").drop("rawPrediction")
+      .drop("probability").select("prediction", "target")
+      .withColumnRenamed("target", "label")
+
+    val gbResults = GBTClassificationModel.load("myGBTree").transform(valid).drop("text")
+      .drop("result").drop("textTransformed").drop("rawPrediction")
+      .drop("probability").select("prediction", "target")
+      .withColumnRenamed("target", "label")
+
+    val gbTreeEvaluator = new MulticlassMetrics(gbResults.as[(Double, Double)].rdd)
+    val lrEvaluator = new MulticlassMetrics(lrResults.as[(Double, Double)].rdd)
+
+    println("Summary for Gradient-boosted tree classifier")
+    evaluationSummary(gbTreeEvaluator)
+    println("Summary for Logistic Regression classifier")
+    evaluationSummary(lrEvaluator)
+
+
   }
 }
