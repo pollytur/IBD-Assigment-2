@@ -1,3 +1,4 @@
+import model.Train
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.ml.feature.Word2Vec
 import org.apache.spark.sql.Row
@@ -10,4 +11,5 @@ import org.apache.spark.ml.classification.LogisticRegression
 
 
 object Main extends App {
+  Train.train()
 }
