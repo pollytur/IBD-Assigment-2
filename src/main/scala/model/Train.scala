@@ -145,7 +145,6 @@ object Train {
 
     valid = Word2VecModel.load("myWord2Vec").transform(valid)
 
-
     val lrResults = LogisticRegressionModel.load("myLR").transform(valid).drop("text")
       .drop("result").drop("textTransformed").drop("rawPrediction")
       .drop("probability").select("prediction", "target")

@@ -13,6 +13,7 @@ object TweetPreprocess {
       res.replaceAll(s"[^a-zA-Z]$pattern[^a-zA-Z]", " "+ReplaceDictionaries.apostrophes2Normal(pattern)+" ")
     }
 
+
     tweetLower = ReplaceDictionaries.smiles2Text.keys.foldLeft(tweetLower) { case (res, pattern) =>
       res.replaceAll(s"[^a-zA-Z]$pattern[^a-zA-Z]", " "+ReplaceDictionaries.smiles2Text(pattern)+" ")
     }
@@ -25,7 +26,7 @@ object TweetPreprocess {
 
   def remUrl(tweet: String): String = {
     // remove urls http://example.com
-    var isUrl="""^((https?|ftp|smtp):\/\/)?(www.)?[a-z0-9]+\.[a-z]+(\/[a-zA-Z0-9#]+\/?)*$"""
+    val isUrl = """^((https?|ftp|smtp):\/\/)?(www.)?[a-z0-9]+\.[a-z]+(\/[a-zA-Z0-9#]+\/?)*$"""
     tweet
     .split(" ")
     .filter(x => !x.matches(isUrl))
