@@ -5,7 +5,7 @@ This project analyzies a stream of Twitter messages (aka tweets) and determine t
 
 1. **Streaming** - the `Streamer` is responsible for connecting to the remote stream and providing next layers an `DSSteam` object to work with  
 2. **Preprocessing** - remove user aliases, links, transforms the whole tweet to lower cases and decrypts abbreviations. Also remove most common words to fasten word2vec.
-3. **Feature extraction` - tokenization and vectorization with the help of Word2Vec.
+3. **Feature extraction** - tokenization and vectorization with the help of Word2Vec.
 4. **Training** - Train model on provided dataset with one of the next models - `Gradient Boosting Tree` and `Logistric Regresion`.
 5. **Predicting** - fed into model tweets obtained from the stream, predict sentiment. Then, write predictions to the output file.
 
