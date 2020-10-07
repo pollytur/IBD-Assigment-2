@@ -1,39 +1,49 @@
-import model.Train
 import org.apache.spark.ml.classification.LogisticRegressionModel
 import org.apache.spark.ml.feature.Word2VecModel
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.{col, udf}
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SQLContext, SaveMode, SparkSession}
+import org.apache.spark.streaming.{Seconds, StreamingContext, Time}
 import preprocessing.TweetPreprocess
 import streaming.Streamer
 
 
 object Main extends App {
-  //    Train.modelEvaluation()
-  val coder2: Seq[String] => String = (arg: Seq[String]) => {
-    arg.mkString(" ")
-  }
-  val trans = udf(coder2)
 
   val session = SparkSession.builder().appName("app_name").master("local[2]").getOrCreate()
+  val sqlContext = session.sqlContext
 
   val vectorizer = Word2VecModel.load("myWord2Vec")
   val model = LogisticRegressionModel.load("myLR")
 
   val (stream, context) = Streamer.stream(session.sparkContext)
 
-  stream.map((rawTweet: String) => TweetPreprocess.preprocessTweet(rawTweet))
-    .map((tweet: String) => createDfForTweet(tweet))
-    .map((frame: DataFrame) => vectorizer.transform(frame))
-    .map((frame: DataFrame) => model.transform(frame))
-    .map((frame :DataFrame) => frame.select("textTransformed", "prediction")
+
+  val coder2: Seq[String] => String = (arg: Seq[String]) => {
+    arg.mkString(" ")
+  }
+  val trans = udf(coder2)
+
+  stream.foreachRDD(rdd => {
+    import session.sqlContext.implicits._
+
+    val result = rdd
+      .map((str: String) => TweetPreprocess.preprocessTweet(str).split(" "))
+      .filter(_.length > 0)
+      .toDF("textTransformed")
+      .transform((value: Dataset[Row]) => vectorizer.transform(value))
+      .transform((value: Dataset[Row]) => model.transform(value))
+      .transform((value: Dataset[Row]) => value.select("textTransformed", "prediction"))
       .withColumn("textTransformed", trans(col("textTransformed")))
-      .writeStream
-      .format("csv")
-      .option("checkpointLocation", "checkpoint/")
-      .option("path", "output_path/")
-      .outputMode("append")
-      .start())
+      .filter((row: Row) => row.getAs[String](0).length > 0)
+
+    if (!result.rdd.isEmpty()) {
+      println("IN")
+      result.coalesce(1).write.mode(SaveMode.Append).csv("output")
+    }
+
+  })
+
 
   context.start()
   context.awaitTermination()
@@ -43,5 +53,4 @@ object Main extends App {
       tweet.split(" ")
     ).map(Tuple1.apply)).toDF("textTransformed")
   }
-
 }
