@@ -11,20 +11,26 @@ This project analyzies a stream of Twitter messages (aka tweets) and determine t
 
 ## Structure
 - **model**
-    - **Train** - Train on dataset and save the model to file (???)
+    - **Train** - Train on dataset and save the model to file 
 - **preprocessing**
     - **ReplaceDictionaries** - decrypts abbreviations
     - **StopWords** - remove most common words
     - **TweetPreprocess** - Provide interface for preprocessing
 - **streaming**
-    - **Main** - ????
+    - **Streamer** - Process stream and save output 
 - **test**
     - **TweetPreprocessSpec** - unit test for preprocessing
 
 ## How to run the project
 
-sbt package
+1. run 
+>sbt package
 
-spark-submit --class Main target/scala-2.12/project-*.jar
+2. copy target/scala-2.12/project-2_2.12-0.1.jar to cluster
+
+3. copy myGNTree myLR myWord2Vec to hdfs to your root repo
+
+4. run on cluster
+> HADOOP_CONF_DIR=/hadoop/etc/hadoop /spark-3.0.1-bin-hadoop2.7/bin/spark-submit --master yarn project-2_2.12-0.1.jar
 
 ## [Link to full report](https://hackmd.io/PWzJJy3cSWiIVeA2-PBuSA)
