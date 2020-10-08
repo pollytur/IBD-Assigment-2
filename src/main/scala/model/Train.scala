@@ -1,6 +1,6 @@
 package model
 
-import org.apache.spark.ml.classification.{GBTClassificationModel, GBTClassifier, LogisticRegression, LogisticRegressionModel}
+import org.apache.spark.ml.classification._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import org.apache.spark.ml.feature.{StopWordsRemover, Word2Vec, Word2VecModel}
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
@@ -44,10 +44,10 @@ object Train {
       .drop("ids").drop("data").drop("flag").drop("user").orderBy(rand())
 
     val split = trainingInit.randomSplit(Array(0.9, 0.1))
-    split(0).write.csv("src/main/sourses/train_dataset.csv")
+    //    split(0).write.csv("src/main/sourses/train_dataset.csv")
     var test = split(1)
-    test = test.withColumn("target", toInt(col("target")))
-    test.write.csv("src/main/sourses/test_dataset.csv")
+    //    test = test.withColumn("target", toInt(col("target")))
+    //    test.write.csv("src/main/sourses/test_dataset.csv")
     val training = split(0)
 
     println("CVS READ")
@@ -63,7 +63,7 @@ object Train {
     val word2Vec = new Word2Vec()
       .setInputCol("textTransformed")
       .setOutputCol("result")
-      .setVectorSize(15)
+      .setVectorSize(100)
       .setMinCount(5)
 
 
@@ -71,7 +71,7 @@ object Train {
     // Save and load model
 
     println("WORD 2 VEC DONE")
-    model.save("myWord2Vec")
+    model.save("myWord2Vec-100")
     println("WORD 2 VEC SAVED")
 
 
@@ -94,7 +94,7 @@ object Train {
     merged = merged.withColumn("text", trans(col("text")))
     merged = merged.withColumn("textTransformed", trans(col("textTransformed")))
 
-    merged.write.csv("after_word2vec_transformed_dataset.csv")
+    //    merged.write.csv("after_word2vec_transformed_dataset.csv")
 
     val lr = new LogisticRegression()
       .setMaxIter(10)
@@ -105,7 +105,7 @@ object Train {
 
     val lrModel = lr.fit(trainingTransformed)
     println("LOGISTIC REGRESSION DONE")
-    lrModel.save("myLR")
+    lrModel.save("myLR-100")
     println("LOGISTIC REGRESSION SAVED")
 
     //  todo check
@@ -118,12 +118,32 @@ object Train {
 
     println("GRADIENT BOOSTING TREE DONE")
 
-    gbTree.save("myGBTree")
+    gbTree.save("myGBTree-100")
 
     println("GRADIENT BOOSTING TREE DONE")
+
+    val lsvc = new LinearSVC()
+      .setFeaturesCol("result")
+      .setLabelCol("target")
+      .setMaxIter(10)
+      .setRegParam(0.1)
+
+    // Fit the model
+    val lsvcModel = lsvc.fit(trainingTransformed)
+
+    lsvcModel.save("LinearSVC-100")
+
+    val rf = new RandomForestClassifier()
+      .setFeaturesCol("result")
+      .setLabelCol("target")
+      .setNumTrees(10)
+      .setFeatureSubsetStrategy("auto")
+      .fit(trainingTransformed)
+
+    rf.save("RandomForest-100")
   }
 
-  def evaluationSummary(evaluator: MulticlassMetrics):Unit={
+  def evaluationSummary(evaluator: MulticlassMetrics): Unit = {
     println(s"Confusion matrix : ${evaluator.confusionMatrix}")
     println(s"For negative(0) label: F-score ${evaluator.fMeasure(0)}, recall: ${evaluator.recall(0)}, " +
       s"precision: ${evaluator.precision(0)}")
@@ -143,25 +163,42 @@ object Train {
     valid = valid.withColumn("text", sqlfunc(col("text")))
     valid = remover.transform(valid)
 
-    valid = Word2VecModel.load("myWord2Vec").transform(valid)
+    valid = Word2VecModel.load("myWord2Vec-100").transform(valid)
 
-    val lrResults = LogisticRegressionModel.load("myLR").transform(valid).drop("text")
+    val lrResults = LogisticRegressionModel.load("myLR-100").transform(valid).drop("text")
       .drop("result").drop("textTransformed").drop("rawPrediction")
       .drop("probability").select("prediction", "target")
       .withColumnRenamed("target", "label")
 
-    val gbResults = GBTClassificationModel.load("myGBTree").transform(valid).drop("text")
+    val gbResults = GBTClassificationModel.load("myGBTree-100").transform(valid).drop("text")
+      .drop("result").drop("textTransformed").drop("rawPrediction")
+      .drop("probability").select("prediction", "target")
+      .withColumnRenamed("target", "label")
+
+    val rfResults = RandomForestClassificationModel.load("RandomForest-100").transform(valid).drop("text")
+      .drop("result").drop("textTransformed").drop("rawPrediction")
+      .drop("probability").select("prediction", "target")
+      .withColumnRenamed("target", "label")
+
+    val lsvcResults = LinearSVCModel.load("LinearSVC-100").transform(valid).drop("text")
       .drop("result").drop("textTransformed").drop("rawPrediction")
       .drop("probability").select("prediction", "target")
       .withColumnRenamed("target", "label")
 
     val gbTreeEvaluator = new MulticlassMetrics(gbResults.as[(Double, Double)].rdd)
     val lrEvaluator = new MulticlassMetrics(lrResults.as[(Double, Double)].rdd)
+    val rfEvaluator = new MulticlassMetrics(rfResults.as[(Double, Double)].rdd)
+    val lsvcEvaluator = new MulticlassMetrics(lsvcResults.as[(Double, Double)].rdd)
 
     println("Summary for Gradient-boosted tree classifier")
     evaluationSummary(gbTreeEvaluator)
     println("Summary for Logistic Regression classifier")
     evaluationSummary(lrEvaluator)
+
+    println("Summary for Random Forest classifier")
+    evaluationSummary(rfEvaluator)
+    println("Summary for Linear SVC classifier")
+    evaluationSummary(lsvcEvaluator)
 
 
   }
