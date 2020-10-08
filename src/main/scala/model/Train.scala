@@ -31,24 +31,33 @@ object Train {
   }
   val sqlfunc = udf(coder)
 
-  def train() = {
+
+  def train(size: Int, mode: String, toSave: Array[String]) = {
+    /*
+    size - outputsize of word2vec
+    mode - classificator choice
+    0-logistic regression, 1, gbtree, 2- random forest, 3 - liner svc, 5 - all
+    toSave - path to save models
+    */
+
     println("TRAIN STARTED")
     val session = SparkSession.builder().appName("app_name").master("local[2]").getOrCreate()
 
 
-
-    //    val toInt = udf[Int, String](x => x.toInt>0 ? 1 | 0)
-
-    val trainingInit = session.read.format("csv").load("src/main/sourses/initial_dataset.csv")
+//    val trainingInit = session.read.format("csv").load("src/main/sourses/test2.csv")
+    val trainingInit = session.read.format("csv").load("initial_dataset.csv")
       .toDF("target", "ids", "data", "flag", "user", "text")
       .drop("ids").drop("data").drop("flag").drop("user").orderBy(rand())
 
     val split = trainingInit.randomSplit(Array(0.9, 0.1))
     //    split(0).write.csv("src/main/sourses/train_dataset.csv")
+//    split(0).write.csv("train_dataset.csv")
     var test = split(1)
-    //    test = test.withColumn("target", toInt(col("target")))
+    test = test.withColumn("target", toInt(col("target")))
     //    test.write.csv("src/main/sourses/test_dataset.csv")
+//    test.write.csv("test_dataset.csv")
     val training = split(0)
+
 
     println("CVS READ")
 
@@ -63,15 +72,15 @@ object Train {
     val word2Vec = new Word2Vec()
       .setInputCol("textTransformed")
       .setOutputCol("result")
-      .setVectorSize(100)
-      .setMinCount(5)
+      .setVectorSize(size)
+      .setMinCount(0)
 
 
     val model = word2Vec.fit(trainingTransformed)
     // Save and load model
 
     println("WORD 2 VEC DONE")
-    model.save("myWord2Vec-100")
+    model.save(toSave(0))
     println("WORD 2 VEC SAVED")
 
 
@@ -95,52 +104,70 @@ object Train {
     merged = merged.withColumn("textTransformed", trans(col("textTransformed")))
 
     //    merged.write.csv("after_word2vec_transformed_dataset.csv")
+    if (mode.equals("0") || mode.equals("5")) {
+      val lr = new LogisticRegression()
+        .setMaxIter(10)
+        .setFeaturesCol("result")
+        .setLabelCol("target")
+        .setRegParam(0.3)
+        .setElasticNetParam(0.8)
 
-    val lr = new LogisticRegression()
-      .setMaxIter(10)
-      .setFeaturesCol("result")
-      .setLabelCol("target")
-      .setRegParam(0.3)
-      .setElasticNetParam(0.8)
+      val lrModel = lr.fit(trainingTransformed)
+      println("LOGISTIC REGRESSION DONE")
+      lrModel.save(toSave(1))
+      println("LOGISTIC REGRESSION SAVED")
+    }
 
-    val lrModel = lr.fit(trainingTransformed)
-    println("LOGISTIC REGRESSION DONE")
-    lrModel.save("myLR-100")
-    println("LOGISTIC REGRESSION SAVED")
+    if (mode.equals("1") || mode.equals("5")) {
+      val gbTree = new GBTClassifier()
+        .setFeaturesCol("result")
+        .setLabelCol("target")
+        .setMaxIter(10)
+        .setFeatureSubsetStrategy("auto")
+        .fit(trainingTransformed)
 
-    //  todo check
-    val gbTree = new GBTClassifier()
-      .setFeaturesCol("result")
-      .setLabelCol("target")
-      .setMaxIter(10)
-      .setFeatureSubsetStrategy("auto")
-      .fit(trainingTransformed)
+      println("GRADIENT BOOSTING TREE DONE")
+      if (mode.equals("5")) {
+        gbTree.save(toSave(2))
+      }
+      else {
+        gbTree.save(toSave(1))
+      }
 
-    println("GRADIENT BOOSTING TREE DONE")
+      println("GRADIENT BOOSTING TREE DONE")
+    }
+    if (mode.equals("3") || mode.equals("5")) {
+      val lsvc = new LinearSVC()
+        .setFeaturesCol("result")
+        .setLabelCol("target")
+        .setMaxIter(10)
+        .setRegParam(0.1)
 
-    gbTree.save("myGBTree-100")
+      // Fit the model
+      val lsvcModel = lsvc.fit(trainingTransformed)
+      if (mode.equals("5")) {
+        lsvcModel.save(toSave(4))
+      }
+      else {
+        lsvcModel.save(toSave(1))
+      }
+    }
 
-    println("GRADIENT BOOSTING TREE DONE")
+    if (mode.equals("2") || mode.equals("5")) {
+      val rf = new RandomForestClassifier()
+        .setFeaturesCol("result")
+        .setLabelCol("target")
+        .setNumTrees(10)
+        .setFeatureSubsetStrategy("auto")
+        .fit(trainingTransformed)
 
-    val lsvc = new LinearSVC()
-      .setFeaturesCol("result")
-      .setLabelCol("target")
-      .setMaxIter(10)
-      .setRegParam(0.1)
-
-    // Fit the model
-    val lsvcModel = lsvc.fit(trainingTransformed)
-
-    lsvcModel.save("LinearSVC-100")
-
-    val rf = new RandomForestClassifier()
-      .setFeaturesCol("result")
-      .setLabelCol("target")
-      .setNumTrees(10)
-      .setFeatureSubsetStrategy("auto")
-      .fit(trainingTransformed)
-
-    rf.save("RandomForest-100")
+      if (mode.equals("5")) {
+        rf.save(toSave(3))
+      }
+      else {
+        rf.save(toSave(1))
+      }
+    }
   }
 
   def evaluationSummary(evaluator: MulticlassMetrics): Unit = {
@@ -156,31 +183,31 @@ object Train {
 
     import session.sqlContext.implicits._
 
-    var valid = session.read.format("csv").load("src/main/sourses/test_dataset.csv")
+    var valid = session.read.format("csv").load("test_dataset.csv")
       .toDF("target", "text")
 
     valid = valid.withColumn("target", toInt(col("target")))
     valid = valid.withColumn("text", sqlfunc(col("text")))
     valid = remover.transform(valid)
 
-    valid = Word2VecModel.load("myWord2Vec-100").transform(valid)
+    valid = Word2VecModel.load("myWord2Vec-tr").transform(valid)
 
-    val lrResults = LogisticRegressionModel.load("myLR-100").transform(valid).drop("text")
+    val lrResults = LogisticRegressionModel.load("myLR-tr").transform(valid).drop("text")
       .drop("result").drop("textTransformed").drop("rawPrediction")
       .drop("probability").select("prediction", "target")
       .withColumnRenamed("target", "label")
 
-    val gbResults = GBTClassificationModel.load("myGBTree-100").transform(valid).drop("text")
+    val gbResults = GBTClassificationModel.load("myGBTree-tr").transform(valid).drop("text")
       .drop("result").drop("textTransformed").drop("rawPrediction")
       .drop("probability").select("prediction", "target")
       .withColumnRenamed("target", "label")
 
-    val rfResults = RandomForestClassificationModel.load("RandomForest-100").transform(valid).drop("text")
+    val rfResults = RandomForestClassificationModel.load("RandomForest-tr").transform(valid).drop("text")
       .drop("result").drop("textTransformed").drop("rawPrediction")
       .drop("probability").select("prediction", "target")
       .withColumnRenamed("target", "label")
 
-    val lsvcResults = LinearSVCModel.load("LinearSVC-100").transform(valid).drop("text")
+    val lsvcResults = LinearSVCModel.load("LinearSVC-tr").transform(valid).drop("text")
       .drop("result").drop("textTransformed").drop("rawPrediction")
       .drop("probability").select("prediction", "target")
       .withColumnRenamed("target", "label")
