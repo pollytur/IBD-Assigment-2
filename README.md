@@ -17,18 +17,19 @@ This project analyzies a stream of Twitter messages (aka tweets) and determine t
     - **StopWords** - remove most common words
     - **TweetPreprocess** - Provide interface for preprocessing
 - **streaming**
-    - **Streamer** - Process stream and save output 
+    - **Streamer** - Process stream and return tweets
 - **test**
     - **TweetPreprocessSpec** - unit test for preprocessing
+- **Main** - Take result from streamer and save output csv with predictions 
 
 ## How to run the project
 
-1. run 
+1. run in the project folder
 >sbt package
 
 2. copy target/scala-2.12/project-2_2.12-0.1.jar to cluster
 
-3. copy myGNTree myLR myWord2Vec to hdfs to your root repo
+3. copy myGNTree myLR myWord2Vec to hdfs to your user repo
 
 4. run on cluster
 > HADOOP_CONF_DIR=/hadoop/etc/hadoop /spark-3.0.1-bin-hadoop2.7/bin/spark-submit --master yarn project-2_2.12-0.1.jar
